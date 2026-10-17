@@ -1,0 +1,17 @@
+%% Logical view: ingestion, retrieval, grounding.
+flowchart LR
+  subgraph Ingestion
+    pdf[PDF] --> pages[Pages: text layer or OCR]
+    pages --> blocks[Text and table blocks]
+    blocks --> chunks[Chunks + contextual headers]
+    chunks --> index[(BM25 + dense vectors)]
+  end
+  subgraph Answering
+    q[Question] --> rw[Rewrite + route]
+    rw --> hy[Hybrid search + RRF]
+    index --> hy
+    hy --> rr[Rerank]
+    rr --> gate{Refusal gate}
+    gate --> llm[LLM with ratio tool]
+    llm --> cite[Ground citations]
+  end

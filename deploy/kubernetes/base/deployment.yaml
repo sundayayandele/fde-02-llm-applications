@@ -1,0 +1,60 @@
+# API keys come from an optional Secret, created out of band:
+#   kubectl -n fde create secret generic fde-02-llm-applications-secrets --from-literal=MISTRAL_API_KEY=...
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fde-02-llm-applications
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: fde-02-llm-applications
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  template:
+    metadata:
+      labels:
+        app: fde-02-llm-applications
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics/
+    spec:
+      serviceAccountName: fde-02-llm-applications
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true          # no fixed runAsUser, so OpenShift can assign one
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          image: fde-02-llm-applications:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: http, containerPort: 8000}
+          envFrom:
+            - configMapRef: {name: fde-02-llm-applications-config}
+            - secretRef: {name: fde-02-llm-applications-secrets, optional: true}
+          resources:
+            requests: {cpu: 250m, memory: 768Mi}
+            limits: {cpu: "1", memory: 1536Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+          startupProbe:
+            httpGet: {path: /health/live, port: http}
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {}

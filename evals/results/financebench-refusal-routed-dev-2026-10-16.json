@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-16",
+  "package_version": "1.1.0",
+  "dataset": "FinanceBench open-source sample (150 questions), commit cc39aeb4afdf",
+  "index": {
+    "documents": 84,
+    "pages": 12013,
+    "chunks": 49329,
+    "table_chunks": 7133,
+    "ocr_pages": 44,
+    "quarantined_sentences": 0,
+    "pii_masked_pages": 128
+  },
+  "index_created": "2026-10-16T20:57:53+00:00",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "split": "dev",
+  "kind": "refusal",
+  "config": {
+    "mode": "hybrid",
+    "embedder": null,
+    "reranker": "lexical",
+    "candidates": 30,
+    "context": 6,
+    "answer_mode": "extractive",
+    "provider": null,
+    "role": "default",
+    "use_tools": true,
+    "route": true,
+    "min_coverage": 0.2,
+    "scope_guard": "finance",
+    "mask_output_pii": true,
+    "max_tool_rounds": 3,
+    "temperature": 0.0
+  },
+  "answerable": 79,
+  "false_refusal_rate": 0.0,
+  "unanswerable_variants": 75,
+  "correct_refusal_rate": 0.88,
+  "refusal_reasons": {
+    "period_not_found": 63,
+    "low_coverage": 3
+  }
+}

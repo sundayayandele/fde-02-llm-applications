@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fde-02-llm-applications-config
+data:
+  SERVICE_NAME: fde-02-llm-applications
+  ENVIRONMENT: k8s
+  LLM_PROVIDER: mistral
+  LOG_LEVEL: INFO

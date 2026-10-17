@@ -1,0 +1,54 @@
+# End-to-end smoke checks run by scripts/smoke_test.py against a live service
+# (local process, Docker/Podman/Rancher Desktop, Kubernetes or cloud).
+# Every image contains the fictional Northwind demo filings, so the questions below work
+# on any corpus, with or without a Mistral key.
+checks:
+  - name: liveness
+    path: /health/live
+    expect_keys: [status]
+  - name: readiness
+    path: /health/ready
+    expect_keys: [status, version, index, documents, answer_mode]
+  - name: metrics exposed
+    path: /metrics/
+    expect_contains: http_requests_total
+  - name: web UI
+    path: /
+    expect_contains: Filing assistant
+  - name: filing list
+    path: /api/v1/filings
+  - name: question validation
+    method: POST
+    path: /api/v1/ask
+    json: {question: "hi"}
+    expect_status: 422
+  - name: answer with citations
+    exercise: true          # needs an index, which needs the ingestion exercises
+    method: POST
+    path: /api/v1/ask
+    json: {question: "What was Northwind's FY2023 capital expenditure in USD millions?"}
+    expect_keys: [answer, citations, refused, timings_ms]
+    expect_contains: NORTHWIND_2023_10K
+  - name: refusal when the period is not covered
+    exercise: true
+    method: POST
+    path: /api/v1/ask
+    json: {question: "What was Northwind's capital expenditure in FY1999?"}
+    expect_contains: period_not_found
+  - name: streamed answer
+    exercise: true
+    method: POST
+    path: /api/v1/ask/stream
+    json: {question: "What quarterly dividend per share did Northwind declare?"}
+    expect_contains: "event: done"
+  - name: search
+    exercise: true
+    method: POST
+    path: /api/v1/search
+    json: {query: "Northwind dividend per share", k: 3}
+  - name: ratio tool
+    exercise: true
+    method: POST
+    path: /api/v1/tools/ratio
+    json: {name: gross_margin, values: {gross_profit: 2160, revenue: 5400}}
+    expect_keys: [value, unit, formula]

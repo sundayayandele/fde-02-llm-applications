@@ -1,0 +1,21 @@
+%% Enterprise view (TOGAF business, application and technology layers).
+flowchart TB
+  subgraph Business["Business layer"]
+    team[Equity research / credit analysts] --> process[Answer questions from filings with evidence]
+    process --> outcome[Minutes instead of hours per question; every figure traceable to a page]
+  end
+  subgraph Application["Application layer"]
+    fa[Filing assistant API + UI]
+    mcp[MCP tool server]
+    llm[Mistral API or self-hosted model]
+  end
+  subgraph Technology["Technology layer"]
+    desk[Desktops: Docker, Podman, Rancher]
+    k8s[Kubernetes / OpenShift]
+    cloud[AWS Fargate · Azure Container Apps · GCP Cloud Run]
+  end
+  process --> fa --> llm
+  process --> mcp
+  fa --> desk
+  fa --> k8s
+  fa --> cloud

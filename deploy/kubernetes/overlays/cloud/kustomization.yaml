@@ -1,0 +1,17 @@
+# Managed Kubernetes (EKS, AKS, GKE). Set the image to your registry with
+#   cd deploy/kubernetes/overlays/cloud && kustomize edit set image fde-02-llm-applications=<registry>/fde-02-llm-applications:<tag>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - ingress.yaml
+images:
+  - name: fde-02-llm-applications
+    newName: REGISTRY/fde-02-llm-applications
+    newTag: "1.1.0"
+patches:
+  - target: {kind: Deployment, name: fde-02-llm-applications}
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always

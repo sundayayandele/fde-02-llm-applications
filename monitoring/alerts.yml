@@ -1,0 +1,50 @@
+groups:
+  - name: fde-02-llm-applications
+    rules:
+      - alert: ServiceDown
+        expr: up{job="fde-02-llm-applications"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "fde-02-llm-applications is not being scraped"
+          runbook: "docs/DEPLOYMENT.md#troubleshooting"
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total[5m])), 1e-9) > 0.05
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 5% of requests return 5xx"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "p95 latency above 1 second"
+
+      # Assistant behaviour
+      - alert: RefusalRateHigh
+        expr: |
+          sum(rate(questions_total{outcome="refused"}[1h]))
+            / clamp_min(sum(rate(questions_total[1h])), 1e-9) > 0.4
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 40% of questions refused for 1 hour (index missing filings, or questions about new periods)"
+          runbook: "docs/DEPLOYMENT.md#troubleshooting"
+
+      - alert: InvalidCitations
+        expr: increase(invalid_citations_total[1h]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "The model cited passages it was not given (possible prompt regression)"
+
+      - alert: LLMSpendHigh
+        expr: increase(llm_cost_usd_total[24h]) > 5
+        labels: {severity: warning}
+        annotations:
+          summary: "Estimated LLM spend above USD 5 in 24 hours (assumed prices)"

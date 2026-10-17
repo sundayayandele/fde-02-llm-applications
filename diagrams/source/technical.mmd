@@ -1,0 +1,14 @@
+%% Technical view: what runs where.
+flowchart TB
+  build[docker build: index stage] -->|download pinned PDFs, OCR, chunk, LSA| image[(Image: app + /app/index + /app/data)]
+  image --> pod
+  user[Analyst] -->|HTTPS| entry{Entry point}
+  entry -->|desktop| pf[127.0.0.1 port / port-forward]
+  entry -->|cloud| managed[Fargate IP / Container Apps / Cloud Run URL]
+  entry -->|OpenShift| route[Route, edge TLS]
+  pf --> pod[API pod: non-root, read-only FS]
+  managed --> pod
+  route --> pod
+  pod -->|MISTRAL_API_KEY from secret store| mistral[(Mistral API, EU)]
+  pod -->|/metrics/| prom[Prometheus] --> graf[Grafana]
+  mcpclient[MCP client] -->|stdio or streamable HTTP| mcp[filing-assistant mcp]

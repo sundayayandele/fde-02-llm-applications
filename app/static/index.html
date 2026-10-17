@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filing assistant</title>
+<style>
+  :root {
+    --bg: #f5f4ef; --panel: #ffffff; --ink: #1c1c1a; --muted: #6a6963; --line: #e2e0d7;
+    --accent: #234e70; --accent-soft: #e3ecf3; --warn: #8a5300; --warn-bg: #fbefdc;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --panel: #1e1e1c; --ink: #ecebe5; --muted: #a2a198; --line: #33322e;
+      --accent: #8dbbe0; --accent-soft: #1f2e3a; --warn: #f0b45e; --warn-bg: #3a2a12;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+           flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+  .grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+           padding: 18px; margin-bottom: 16px; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  select, textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+                     border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  textarea { min-height: 96px; resize: vertical; }
+  select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent);
+                                                       outline-offset: 1px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  button { font: inherit; border-radius: 8px; padding: 9px 16px; cursor: pointer;
+           border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff;
+                   font-weight: 600; }
+  @media (prefers-color-scheme: dark) { button.primary { color: #0f1d28; } }
+  button.chip { font-size: 13px; padding: 5px 10px; border-radius: 999px; color: var(--muted); }
+  #answer { white-space: pre-wrap; min-height: 2em; }
+  .ref { display: inline-block; font-size: 12px; font-weight: 600; padding: 0 6px; margin: 0 1px;
+         border-radius: 6px; background: var(--accent-soft); color: var(--accent); cursor: pointer;
+         border: 0; line-height: 1.6; }
+  .refused { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 10px 12px; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .source { border-top: 1px solid var(--line); padding: 10px 0; }
+  .source:first-child { border-top: 0; }
+  .source h3 { font-size: 14px; margin: 0 0 4px; font-family: var(--mono); }
+  .source p { margin: 0; font-size: 13px; color: var(--muted); white-space: pre-wrap;
+              max-height: 9.5em; overflow: hidden; }
+  .source.active { background: var(--accent-soft); margin: 0 -10px; padding: 10px; border-radius: 8px; }
+  a { color: var(--accent); }
+  .cursor::after { content: "▍"; animation: blink 1s steps(1) infinite; color: var(--muted); }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Filing assistant</h1>
+      <p class="sub">Answers from company filings, with the page each figure comes from. Says so when the filings don't contain the answer.</p>
+    </div>
+    <span class="sub" id="status"></span>
+  </header>
+
+  <div class="grid">
+    <section>
+      <div class="panel">
+        <label for="filing">Filings</label>
+        <select id="filing"><option value="">All filings (route by company and year)</option></select>
+        <div style="height:12px"></div>
+        <label for="q">Question</label>
+        <textarea id="q" maxlength="2000" placeholder="e.g. What was 3M's capital expenditure in FY2018?"></textarea>
+        <div class="row">
+          <button class="primary" id="go">Ask</button>
+          <button class="chip" data-q="What is the FY2018 capital expenditure amount (in USD millions) for 3M?">3M capex FY2018</button>
+          <button class="chip" data-q="What was Northwind's FY2023 capital expenditure in USD millions?">Demo: Northwind capex</button>
+          <button class="chip" data-q="What was 3M's revenue in FY1999?">Not in the filings</button>
+        </div>
+      </div>
+      <div class="panel" id="result" hidden aria-live="polite">
+        <div id="answer"></div>
+        <div class="meta" id="meta"></div>
+      </div>
+    </section>
+    <aside class="panel" id="sources-panel" hidden>
+      <label>Sources</label>
+      <div id="sources"></div>
+    </aside>
+  </div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  let hits = [];
+
+  async function init() {
+    try {
+      const [ready, filings] = await Promise.all([
+        fetch("health/ready").then((r) => r.json()), fetch("api/v1/filings").then((r) => r.json())]);
+      $("status").textContent = ready.index
+        ? `v${ready.version} · ${ready.documents} filings · ${ready.answer_mode} answers`
+        : "No index loaded";
+      $("filing").innerHTML += filings.map((f) =>
+        `<option value="${esc(f.doc)}">${esc(f.company)} · ${esc(f.period ?? "")} · ${esc(f.type)}</option>`).join("");
+    } catch (e) { $("status").textContent = "Service unavailable"; }
+  }
+
+  function renderAnswer(text, done) {
+    const html = esc(text).replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (m, refs) =>
+      refs.split(",").map((r) => `<button class="ref" data-ref="${r.trim()}">${r.trim()}</button>`).join(""));
+    $("answer").innerHTML = html;
+    $("answer").classList.toggle("cursor", !done);
+    $("answer").querySelectorAll(".ref").forEach((b) => b.addEventListener("click", () => focusSource(+b.dataset.ref)));
+  }
+
+  function renderSources() {
+    $("sources-panel").hidden = !hits.length;
+    $("sources").innerHTML = hits.map((h) => `
+      <div class="source" id="src-${h.ref}">
+        <h3>[${h.ref}] ${esc(h.doc)} p.${h.page}</h3>
+        <div class="meta" style="margin:0 0 4px">${esc(h.title)} · ${esc(h.kind)} ·
+          <a href="api/v1/filings/${encodeURIComponent(h.doc)}/pdf#page=${h.page}" target="_blank" rel="noopener">open PDF page</a></div>
+        <p>${esc(h.preview)}</p>
+      </div>`).join("");
+  }
+
+  function focusSource(ref) {
+    document.querySelectorAll(".source").forEach((s) => s.classList.remove("active"));
+    const el = $("src-" + ref);
+    if (el) { el.classList.add("active"); el.scrollIntoView({behavior: "smooth", block: "nearest"}); }
+  }
+
+  async function ask() {
+    const question = $("q").value.trim();
+    if (question.length < 3) { $("q").focus(); return; }
+    const doc = $("filing").value;
+    $("go").disabled = true; $("result").hidden = false; $("meta").textContent = "";
+    $("answer").classList.remove("refused");
+    hits = []; renderSources(); let text = ""; renderAnswer("", false);
+    try {
+      const r = await fetch("api/v1/ask/stream", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({question, docs: doc ? [doc] : null})});
+      if (!r.ok) { const d = await r.json(); throw new Error(typeof d.detail === "string" ? d.detail : "Request failed"); }
+      const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
+      while (true) {
+        const {value, done} = await reader.read(); if (done) break;
+        buf += dec.decode(value, {stream: true});
+        let i;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, i); buf = buf.slice(i + 2);
+          const line = block.split("\n").find((l) => l.startsWith("data:"));
+          if (!line) continue;
+          const ev = JSON.parse(line.slice(5));
+          if (ev.event === "hits") { hits = ev.hits; renderSources(); }
+          if (ev.event === "token") { text += ev.text; renderAnswer(text, false); }
+          if (ev.event === "error") throw new Error("The model call failed (" + ev.detail + ")");
+          if (ev.event === "done") {
+            renderAnswer(text, true);
+            if (ev.refused) $("answer").classList.add("refused");
+            const t = ev.timings_ms || {};
+            $("meta").textContent = [ev.model || "extractive (no model)", t.total ? `${Math.round(t.total)} ms` : "",
+              ev.cost_usd != null ? `USD ${ev.cost_usd.toFixed(5)}` : "",
+              ev.refused ? `refused: ${ev.refusal_reason}` : `${ev.citations.length} citation(s)`]
+              .filter(Boolean).join(" · ");
+          }
+        }
+      }
+    } catch (e) {
+      $("answer").classList.remove("cursor");
+      $("answer").innerHTML = `<span class="refused">${esc(e.message)}</span>`;
+    } finally { $("go").disabled = false; }
+  }
+
+  $("go").addEventListener("click", ask);
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask(); });
+  document.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => { $("q").value = b.dataset.q; ask(); }));
+  init();
+</script>
+</body>
+</html>

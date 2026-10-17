@@ -1,0 +1,50 @@
+replicaCount: 2
+
+image:
+  repository: fde-02-llm-applications
+  tag: local
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+  targetPort: 8000
+
+config:
+  ENVIRONMENT: helm
+  LLM_PROVIDER: mistral
+  LOG_LEVEL: INFO
+
+# Name of an existing Secret holding API keys (MISTRAL_API_KEY, ...). Optional.
+existingSecret: fde-02-llm-applications-secrets
+
+resources:
+  requests: {cpu: 250m, memory: 768Mi}
+  limits: {cpu: "1", memory: 1536Mi}
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+
+# OpenShift: set route.enabled=true and leave podSecurityContext without runAsUser.
+route:
+  enabled: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile: {type: RuntimeDefault}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
