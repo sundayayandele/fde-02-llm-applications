@@ -1,0 +1,50 @@
+name: publish-starter
+
+# On every release tag, regenerate the learner starter repo from this reference repo
+# and push it to <owner>/<repo>-starter.
+#
+# One-time setup:
+#   1. Create the empty repo <repo>-starter on GitHub and mark it as a template repository.
+#   2. Create a fine-grained token with Contents: read/write on that repo only.
+#   3. Save it here as the repository secret STARTER_REPO_TOKEN.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: ${{ !endsWith(github.repository, '-starter') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: reference
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}-starter
+          token: ${{ secrets.STARTER_REPO_TOKEN }}
+          path: starter
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate starter
+        run: python reference/scripts/make_starter.py --src reference --out starter --force
+      - name: Check the starter builds and its structure tests pass
+        working-directory: starter
+        run: |
+          pip install -e ".[dev]"
+          python scripts/check_structure.py
+          pytest -m "not exercise"
+      - name: Commit and push
+        working-directory: starter
+        run: |
+          git config user.name "fde-starter-bot"
+          git config user.email "fde-starter-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "Starter unchanged."; exit 0; fi
+          git commit -m "Sync starter from ${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}"
+          git push

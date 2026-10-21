@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+kubeconfig*
+
+# Data, models and run artefacts (publish models to the Hugging Face Hub, not Git)
+data/
+artifacts/*
+!artifacts/.gitkeep
+models/
+checkpoints/
+outputs/
+mlruns/
+wandb/
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.ckpt
+*.sqlite
+*.db
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+.terraform.lock.hcl
+terraform.tfvars
+
+# Rendered diagrams (CI renders them)
+diagrams/rendered/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+index/

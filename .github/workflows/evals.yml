@@ -1,0 +1,70 @@
+name: evals
+
+# FinanceBench evaluation. Downloads the pinned questions and PDFs, builds the index and runs:
+#   - offline: retrieval (recall@k, MRR), refusal gate (dev and test halves), extractive answers
+#   - with MISTRAL_API_KEY (repository secret) and "llm: true": mistral-embed hybrid retrieval,
+#     Mistral answers on the test half graded by an LLM judge, latency and cost per question.
+# Weekly offline run; run by hand for the LLM numbers. Reports are uploaded as an artefact.
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      llm:
+        description: "Also run Mistral embeddings, answers and judge (uses MISTRAL_API_KEY, costs money)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  financebench:
+    runs-on: ubuntu-latest
+    if: ${{ !endsWith(github.repository, '-starter') }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+      - run: pip install -e ".[dev]"
+      - run: make download
+      - run: make ingest
+      - name: Offline evaluation
+        run: |
+          mkdir -p ci-results
+          filing-assistant eval-retrieval --out ci-results
+          filing-assistant eval-refusal --split dev --answer-mode extractive --out ci-results
+          filing-assistant eval-refusal --split test --answer-mode extractive --out ci-results
+          filing-assistant eval-answers --answer-mode extractive --out ci-results
+      - name: Mistral evaluation
+        if: ${{ inputs.llm }}
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: |
+          test -n "$MISTRAL_API_KEY" || { echo "Set the MISTRAL_API_KEY repository secret"; exit 1; }
+          filing-assistant embed mistral
+          filing-assistant eval-retrieval --only hybrid dense --out ci-results
+          filing-assistant eval-answers --answer-mode llm --embedder mistral --judge --split test --out ci-results
+          filing-assistant eval-answers --answer-mode llm --embedder mistral --judge --split test --scope doc --out ci-results
+      - name: Summary
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, glob
+          for path in sorted(glob.glob("ci-results/*.json")):
+              data = json.load(open(path))
+              if data.get("kind") == "answers":
+                  print(f"### {path}\n```json\n{json.dumps(data['summary'], indent=2)}\n```")
+              elif data.get("kind") == "refusal":
+                  print(f"### {path}: false refusals {data['false_refusal_rate']}, "
+                        f"correct refusals {data['correct_refusal_rate']}")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: financebench-results
+          path: ci-results/
