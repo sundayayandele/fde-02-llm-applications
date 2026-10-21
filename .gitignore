@@ -24,7 +24,7 @@ kubeconfig*
 data/
 artifacts/*
 !artifacts/.gitkeep
-models/
+/models/
 checkpoints/
 outputs/
 mlruns/
