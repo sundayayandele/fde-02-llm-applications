@@ -1,5 +1,7 @@
 # fde-02-llm-applications: document assistant over company filings
 
+[![Open the starter in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/sundayayandele/fde-02-llm-applications-starter?quickstart=1)
+
 Phase 2 (weeks 11–15) and **Capstone 1** of the **Forward Deployed ML Engineer: Zero-to-Hired** series. You build the most requested LLM system in enterprise work: an assistant that answers questions from a customer's own documents. It **cites the page every figure comes from**, and **says so when the documents don't contain the answer**.
 
 **The system:** `filing-assistant`, a typed and tested Python package with a CLI, a streaming FastAPI service, a web UI and an MCP tool server, over public company filings (10-K, 10-Q, 8-K, earnings releases):
